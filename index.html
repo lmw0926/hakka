@@ -65,7 +65,11 @@
 </head>
 <body>
   <div id="sheet-buttons" class="d-flex justify-content-center flex-wrap gap-2 mb-3"></div>
-  
+  <div class="d-grid gap-2 mb-3">
+  <button id="playAllBtn" class="btn btn-success" onclick="playAllOnPage()">
+    🎧 播放本頁所有音檔 (循序播放)
+  </button>
+</div>
   <div class="row mb-3">
     <div class="col-12">
       <div class="input-group">
@@ -106,6 +110,76 @@
     const API_URL = "https://script.google.com/macros/s/AKfycbw8C0BLvA-MEi-6yb035L1h2Nc27bH8gKxs9uWoEXUlJ8hqVCwKXegKnj-AbZv6YtQ/exec"; 
 
     let currentSheet = "";
+    let currentPlaylist = [];
+    let currentIndex = 0;
+    
+    async function playAllOnPage() {
+      const audioPlayer = document.getElementById('global-audio');
+      
+      // 1. 抓取目前頁面（filteredData 且在當前分頁）的所有音檔
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const pagedData = filteredData.slice(start, end);
+      
+      // 2. 過濾掉沒有音檔的項目
+      currentPlaylist = pagedData
+        .filter(item => item.audioUrl && item.audioUrl !== "null" && item.audioUrl.trim() !== "")
+        .map(item => ({
+          url: item.audioUrl.trim().replace("dl=0", "raw=1"),
+          name: item.word
+        }));
+    
+      if (currentPlaylist.length === 0) {
+        alert("本頁沒有可播放的音檔！");
+        return;
+      }
+    
+      // 3. 從第一個開始播放
+      currentIndex = 0;
+      playNextInQueue();
+      
+      // 4. 設定監聽器：當目前的音檔播完，自動播下一個
+      audioPlayer.onended = function() {
+        currentIndex++;
+        if (currentIndex < currentPlaylist.length) {
+          playNextInQueue();
+        } else {
+          document.getElementById('current-word').innerText = "✅ 全頁播放完畢";
+          // 移除監聽器防止干擾手動單獨點擊
+          audioPlayer.onended = null;
+        }
+      };
+    }
+    
+    function playNextInQueue() {
+      const audioPlayer = document.getElementById('global-audio');
+      const item = currentPlaylist[currentIndex];
+      
+      document.getElementById('player-container').style.display = 'block';
+      document.getElementById('current-word').innerText = `正在連續播放 (${currentIndex + 1}/${currentPlaylist.length}): ${item.name}`;
+      
+      audioPlayer.src = item.url;
+      audioPlayer.play().catch(e => {
+        console.error("播放出錯，跳過此項:", e);
+        // 出錯（如網址失效）就自動跳下一首
+        currentIndex++;
+        if (currentIndex < currentPlaylist.length) playNextInQueue();
+      });
+    }
+    
+    // 修改原有的 playAudio 函式，避免手動點擊與自動播放衝突
+    function playAudio(url, name) {
+      const audioPlayer = document.getElementById('global-audio');
+      // 手動點擊時，取消自動播放的監聽器
+      audioPlayer.onended = null; 
+      
+      if (!url || url === "null" || url.trim() === "") { alert("目前沒有錄音檔喔！"); return; }
+      const finalUrl = url.trim().replace("dl=0", "raw=1");
+      document.getElementById('player-container').style.display = 'block';
+      document.getElementById('current-word').innerText = "播放: " + name;
+      audioPlayer.src = finalUrl;
+      audioPlayer.play().catch(e => console.error(e));
+    }
 
     async function init() {
       try {

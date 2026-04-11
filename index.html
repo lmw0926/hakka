@@ -312,9 +312,17 @@
 
     // 在 render() 渲染完單字卡後執行
     function fixMissingCharacters() {
-      if (typeof(CNS11643) !== 'undefined') {
-        // 這會掃描網頁上的文字，如果發現系統不支援的字，會自動下載字型
-        CNS11643.fixed(); 
+      // 檢查 script 是否成功載入
+      if (typeof CNS11643 !== 'undefined') {
+        try {
+          // 稍微延遲 100ms 確保瀏覽器已完成文字排版
+          setTimeout(() => {
+            CNS11643.fixed();
+            console.log("全字庫動態補字掃描中...");
+          }, 100);
+        } catch (e) {
+          console.error("全字庫補字執行失敗:", e);
+        }
       }
     }
 

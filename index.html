@@ -169,45 +169,61 @@
     // 播放邏輯核心：支援區段播放 (startTime-endTime)
     function playAudio(url, name, timeRange) {
       const audioPlayer = document.getElementById('global-audio');
+      
+      // 1. 初始化狀態
       audioPlayer.onended = null; 
       clearInterval(timeCheckInterval); 
-
+    
       if (!url || url === "null" || url.trim() === "") { alert("目前沒有錄音檔喔！"); return; }
       
       const finalUrl = url.trim().replace("dl=0", "raw=1");
       document.getElementById('player-container').style.display = 'block';
-      document.getElementById('current-word').innerText = "播放: " + name;
+      document.getElementById('current-word').innerText = "準備中: " + name;
       
-      audioPlayer.src = finalUrl;
-      audioPlayer.load();
-
+      // 2. 解析時間範圍
       let startTime = 0;
       let endTime = 0;
-      if (timeRange && timeRange.includes('-')) {
+      if (timeRange && typeof timeRange === 'string' && timeRange.includes('-')) {
         const parts = timeRange.split('-');
         startTime = parseFloat(parts[0]) || 0;
         endTime = parseFloat(parts[1]) || 0;
       }
-
-      audioPlayer.oncanplay = function() {
-        if (startTime > 0) audioPlayer.currentTime = startTime;
-        audioPlayer.play();
-        
-        if (endTime > startTime) {
-          timeCheckInterval = setInterval(() => {
-            if (audioPlayer.currentTime >= endTime) {
-              audioPlayer.pause();
-              clearInterval(timeCheckInterval);
-              document.getElementById('current-word').innerText = "播放完畢 (片段)";
-              // 如果是自動連播模式，手動觸發下一首
-              if (currentPlaylist.length > 0) {
-                 currentIndex++;
-                 if (currentIndex < currentPlaylist.length) playNextInQueue();
-              }
-            }
-          }, 100);
+    
+      // 3. 核心修正：先設定來源並 Load
+      audioPlayer.src = finalUrl;
+      audioPlayer.load();
+    
+      // 4. 使用對時間跳轉最友善的事件：loadedmetadata
+      audioPlayer.onloadedmetadata = function() {
+        if (startTime > 0) {
+          audioPlayer.currentTime = startTime;
         }
-        audioPlayer.oncanplay = null;
+        
+        // 顯示正在播放
+        document.getElementById('current-word').innerText = "播放中: " + name;
+        
+        audioPlayer.play().then(() => {
+          // 5. 播放成功後，設定結束時間檢查器
+          if (endTime > startTime) {
+            timeCheckInterval = setInterval(() => {
+              if (audioPlayer.currentTime >= endTime) {
+                audioPlayer.pause();
+                clearInterval(timeCheckInterval);
+                document.getElementById('current-word').innerText = "播放完畢 (片段)";
+                
+                // 如果是循序播放模式，自動下一首
+                if (currentPlaylist.length > 0 && currentIndex < currentPlaylist.length - 1) {
+                  currentIndex++;
+                  playNextInQueue();
+                }
+              }
+            }, 100);
+          }
+        }).catch(e => {
+          console.error("播放被攔截，請確保是手動觸發:", e);
+        });
+    
+        audioPlayer.onloadedmetadata = null; // 防止重複執行
       };
     }
 

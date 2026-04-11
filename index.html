@@ -6,11 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    /* 引用 Google 提供的思源黑體，它包含非常廣的罕用字集 */
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
     
     body {
-      /* 將思源黑體設為優先字體 */
       font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: #f8f9fa; 
       padding: 15px; 
@@ -32,7 +30,6 @@
     .card-front { border-left: 5px solid #007bff; }
     .card-back { transform: rotateY(180deg); background: #f0f7ff; border-left: 5px solid #28a745; }
     
-    /* 星號標記樣式 */
     .word-card.starred-border { background-color: #fffdf0 !important; }
     .word-card.starred-border .card-front { border-left: 5px solid #f1c40f; }
 
@@ -50,7 +47,7 @@
       font-size: 0.95rem; color: #34495e; border-radius: 0 4px 4px 0;
       flex-grow: 1; overflow-y: auto;
     }
-    .example-label { white-space: pre-line; font-size: 0.8rem; color: #7f8c8d; display: block; margin-bottom: 3px; font-weight: bold; }
+    .example-label { font-size: 0.8rem; color: #7f8c8d; display: block; margin-bottom: 3px; font-weight: bold; }
     .play-icon-btn {
       background: #007bff; color: white; border-radius: 50%;
       width: 35px; height: 35px; display: flex;
@@ -58,10 +55,7 @@
       font-size: 1rem; margin-right: 12px; flex-shrink: 0;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.2s;
     }
-    .star-btn {
-      background: none; border: none; font-size: 1.5rem; color: #ccc;
-      cursor: pointer; margin-left: 10px; padding: 0; line-height: 1;
-    }
+    .star-btn { background: none; border: none; font-size: 1.5rem; color: #ccc; cursor: pointer; margin-left: 10px; padding: 0; line-height: 1; }
     .star-btn.active { color: #f1c40f; }
     #player-container {
       position: fixed; bottom: 0; left: 0; width: 100%;
@@ -76,10 +70,10 @@
 <body>
   <div id="sheet-buttons" class="d-flex justify-content-center flex-wrap gap-2 mb-3"></div>
   <div class="d-grid gap-2 mb-3">
-  <button id="playAllBtn" class="btn btn-success" onclick="playAllOnPage()">
-    🎧 播放本頁所有音檔 (循序播放)
-  </button>
-</div>
+    <button id="playAllBtn" class="btn btn-success" onclick="playAllOnPage()">
+      🎧 播放本頁所有音檔 (循序播放)
+    </button>
+  </div>
   <div class="row mb-3">
     <div class="col-12">
       <div class="input-group">
@@ -116,86 +110,18 @@
     let filteredData = [];
     let currentPage = 1;
     const itemsPerPage = 10;
-    // 重要：請確保這裡的網址是你 GAS 部署後的 /exec 網址
     const API_URL = "https://script.google.com/macros/s/AKfycbw8C0BLvA-MEi-6yb035L1h2Nc27bH8gKxs9uWoEXUlJ8hqVCwKXegKnj-AbZv6YtQ/exec"; 
 
     let currentSheet = "";
     let currentPlaylist = [];
     let currentIndex = 0;
-    
-    async function playAllOnPage() {
-      const audioPlayer = document.getElementById('global-audio');
-      
-      // 1. 抓取目前頁面（filteredData 且在當前分頁）的所有音檔
-      const start = (currentPage - 1) * itemsPerPage;
-      const end = start + itemsPerPage;
-      const pagedData = filteredData.slice(start, end);
-      
-      // 2. 過濾掉沒有音檔的項目
-      currentPlaylist = pagedData
-        .filter(item => item.audioUrl && item.audioUrl !== "null" && item.audioUrl.trim() !== "")
-        .map(item => ({
-          url: item.audioUrl.trim().replace("dl=0", "raw=1"),
-          name: item.word
-        }));
-    
-      if (currentPlaylist.length === 0) {
-        alert("本頁沒有可播放的音檔！");
-        return;
-      }
-    
-      // 3. 從第一個開始播放
-      currentIndex = 0;
-      playNextInQueue();
-      
-      // 4. 設定監聽器：當目前的音檔播完，自動播下一個
-      audioPlayer.onended = function() {
-        currentIndex++;
-        if (currentIndex < currentPlaylist.length) {
-          playNextInQueue();
-        } else {
-          document.getElementById('current-word').innerText = "✅ 全頁播放完畢";
-          // 移除監聽器防止干擾手動單獨點擊
-          audioPlayer.onended = null;
-        }
-      };
-    }
-    
-    function playNextInQueue() {
-      const audioPlayer = document.getElementById('global-audio');
-      const item = currentPlaylist[currentIndex];
-      
-      document.getElementById('player-container').style.display = 'block';
-      document.getElementById('current-word').innerText = `正在連續播放 (${currentIndex + 1}/${currentPlaylist.length}): ${item.name}`;
-      
-      audioPlayer.src = item.url;
-      audioPlayer.play().catch(e => {
-        console.error("播放出錯，跳過此項:", e);
-        // 出錯（如網址失效）就自動跳下一首
-        currentIndex++;
-        if (currentIndex < currentPlaylist.length) playNextInQueue();
-      });
-    }
-    
-    // 修改原有的 playAudio 函式，避免手動點擊與自動播放衝突
-    function playAudio(url, name) {
-      const audioPlayer = document.getElementById('global-audio');
-      // 手動點擊時，取消自動播放的監聽器
-      audioPlayer.onended = null; 
-      
-      if (!url || url === "null" || url.trim() === "") { alert("目前沒有錄音檔喔！"); return; }
-      const finalUrl = url.trim().replace("dl=0", "raw=1");
-      document.getElementById('player-container').style.display = 'block';
-      document.getElementById('current-word').innerText = "播放: " + name;
-      audioPlayer.src = finalUrl;
-      audioPlayer.play().catch(e => console.error(e));
-    }
+    let timeCheckInterval; 
 
+    // 初始化與資料載入
     async function init() {
       try {
         const response = await fetch(`${API_URL}?action=getSheets`);
         const names = await response.json();
-        
         if (names && names.length > 0) {
           const btnContainer = document.getElementById('sheet-buttons');
           btnContainer.innerHTML = '';
@@ -210,24 +136,20 @@
           loadData();
         }
       } catch (err) {
-        document.getElementById('app').innerHTML = "連線失敗，請檢查網路或 API 網址。";
+        document.getElementById('app').innerHTML = "連線失敗，請檢查網路。";
       }
     }
 
     async function loadData() {
-      document.getElementById('app').innerHTML = `<div class="spinner-border text-primary" role="status"></div><p>載入 ${currentSheet} 中...</p>`;
-      
+      document.getElementById('app').innerHTML = `<div class="spinner-border text-primary"></div><p>載入 ${currentSheet} 中...</p>`;
       try {
-        // 同步抓取資料與分類
         const [dataRes, catRes] = await Promise.all([
           fetch(`${API_URL}?sheet=${currentSheet}`),
           fetch(`${API_URL}?action=getCategories&sheet=${currentSheet}`)
         ]);
-
         allData = await dataRes.json();
         const categories = await catRes.json();
 
-        // 更新分類選單
         const select = document.getElementById('categorySelect');
         select.innerHTML = '<option value="all">全部類別</option><option value="my_stars">⭐ 我的收藏</option>';
         categories.forEach(cat => {
@@ -244,48 +166,104 @@
       }
     }
 
-    function switchSheet(name) {
-      currentSheet = name;
-      document.querySelectorAll('#sheet-buttons button').forEach(btn => {
-        btn.className = (btn.innerText === name) ? "btn btn-primary" : "btn btn-outline-primary";
-      });
-      loadData();
-    }
+    // 播放邏輯核心：支援區段播放 (startTime-endTime)
+    function playAudio(url, name, timeRange) {
+      const audioPlayer = document.getElementById('global-audio');
+      audioPlayer.onended = null; 
+      clearInterval(timeCheckInterval); 
 
-    // --- 以下為渲染與邏輯功能，保持不變但確保變數名稱對應 ---
+      if (!url || url === "null" || url.trim() === "") { alert("目前沒有錄音檔喔！"); return; }
+      
+      const finalUrl = url.trim().replace("dl=0", "raw=1");
+      document.getElementById('player-container').style.display = 'block';
+      document.getElementById('current-word').innerText = "播放: " + name;
+      
+      audioPlayer.src = finalUrl;
+      audioPlayer.load();
 
-    function render() {
-      const app = document.getElementById('app');
-      if (!filteredData || filteredData.length === 0) {
-        app.innerHTML = "目前沒有資料。";
-        return;
+      let startTime = 0;
+      let endTime = 0;
+      if (timeRange && timeRange.includes('-')) {
+        const parts = timeRange.split('-');
+        startTime = parseFloat(parts[0]) || 0;
+        endTime = parseFloat(parts[1]) || 0;
       }
 
+      audioPlayer.oncanplay = function() {
+        if (startTime > 0) audioPlayer.currentTime = startTime;
+        audioPlayer.play();
+        
+        if (endTime > startTime) {
+          timeCheckInterval = setInterval(() => {
+            if (audioPlayer.currentTime >= endTime) {
+              audioPlayer.pause();
+              clearInterval(timeCheckInterval);
+              document.getElementById('current-word').innerText = "播放完畢 (片段)";
+              // 如果是自動連播模式，手動觸發下一首
+              if (currentPlaylist.length > 0) {
+                 currentIndex++;
+                 if (currentIndex < currentPlaylist.length) playNextInQueue();
+              }
+            }
+          }, 100);
+        }
+        audioPlayer.oncanplay = null;
+      };
+    }
+
+    async function playAllOnPage() {
       const start = (currentPage - 1) * itemsPerPage;
       const end = start + itemsPerPage;
-      const pagedData = filteredData.slice(start, end);
+      currentPlaylist = filteredData.slice(start, end)
+        .filter(item => item.audioUrl && item.audioUrl !== "null");
+
+      if (currentPlaylist.length === 0) return alert("無音檔");
+      currentIndex = 0;
+      playNextInQueue();
+    }
+
+    function playNextInQueue() {
+      const item = currentPlaylist[currentIndex];
+      // 呼叫 playAudio 時傳入 timeRange
+      playAudio(item.audioUrl, item.word, item.timeRange);
+      
+      // 非區段播放時的自動跳下一首邏輯
+      const audioPlayer = document.getElementById('global-audio');
+      if (!item.timeRange || !item.timeRange.includes('-')) {
+        audioPlayer.onended = () => {
+          currentIndex++;
+          if (currentIndex < currentPlaylist.length) playNextInQueue();
+          else document.getElementById('current-word').innerText = "✅ 全頁播放完畢";
+        };
+      }
+    }
+
+    // 渲染與其他功能
+    function render() {
+      const app = document.getElementById('app');
+      if (!filteredData || filteredData.length === 0) { app.innerHTML = "目前沒有資料。"; return; }
+
+      const start = (currentPage - 1) * itemsPerPage;
+      const pagedData = filteredData.slice(start, start + itemsPerPage);
       const totalPages = Math.ceil(filteredData.length / itemsPerPage);
       const starredList = getStarredList();
       
       let html = '';
       pagedData.forEach((item) => {
-        const word = item.word || "未填寫";
         const isStarred = starredList.includes(String(item.id));
         const starClass = isStarred ? 'active' : '';
         const starredCardClass = isStarred ? 'starred-border' : '';
-        let badges = '';
-        if (item.pos1) badges += `<span class="badge bg-pos">${item.pos1}</span>`;
-        if (item.category) badges += `<span class="badge bg-cat">${item.category}</span>`;
+        let badges = `<span class="badge bg-pos">${item.pos1 || ''}</span><span class="badge bg-cat">${item.category || ''}</span>`;
 
         html += `
           <div class="card-container">
             <div class="word-card ${starredCardClass}" onclick="flipCard(this)">
               <div class="card-front">
                 <div class="word-header">
-                  <button class="play-icon-btn" onclick="event.stopPropagation(); playAudio('${item.audioUrl}', '${word}')">▶</button>
-                  <span class="word-title">${word}</span>
+                  <button class="play-icon-btn" onclick="event.stopPropagation(); playAudio('${item.audioUrl}', '${item.word}', '${item.timeRange}')">▶</button>
+                  <span class="word-title">${item.word}</span>
                   <button class="star-btn ${starClass}" onclick="toggleStar('${item.id}', event)">★</button>
-                  <span class="word-no">#${item.id || ''}</span>
+                  <span class="word-no">#${item.id}</span>
                 </div>
                 <div class="pinyin" style="margin-left: 47px;">${item.pinyin || ''}</div>
                 <div class="badge-group" style="margin-left: 47px;">${badges}</div>
@@ -293,9 +271,9 @@
               </div>
               <div class="card-back">
                 <div class="word-header"><span class="word-title" style="color:#28a745;">解釋與翻譯</span></div>
-                <div class="mt-2 text-start"><small class="text-muted">華語詞義：</small><p class="mb-2">${item.meaning || '（無資料）'}</p></div>
-                <hr class="my-1">
-                <div class="mt-1 text-start"><small class="text-muted">翻譯：</small><p class="text-secondary small">${item.translation || '（無資料）'}</p></div>
+                <div class="mt-2 text-start small">華語詞義：<p>${item.meaning || ''}</p></div>
+                <hr>
+                <div class="text-start small text-secondary">翻譯：<p>${item.translation || ''}</p></div>
               </div>
             </div>
           </div>`;
@@ -306,72 +284,56 @@
       document.getElementById('totalPages').innerText = `/ ${totalPages} 頁`;
       document.getElementById('prevBtn').disabled = (currentPage === 1);
       document.getElementById('nextBtn').disabled = (currentPage === totalPages);
-
-      fixMissingCharacters()
+      
+      fixMissingCharacters();
     }
 
-    // 在 render() 渲染完單字卡後執行
     function fixMissingCharacters() {
-      // 檢查 script 是否成功載入
       if (typeof CNS11643 !== 'undefined') {
-        try {
-          // 稍微延遲 100ms 確保瀏覽器已完成文字排版
-          setTimeout(() => {
-            CNS11643.fixed();
-            console.log("全字庫動態補字掃描中...");
-          }, 100);
-        } catch (e) {
-          console.error("全字庫補字執行失敗:", e);
-        }
+        setTimeout(() => { CNS11643.fixed(); }, 150);
       }
+    }
+
+    function switchSheet(name) {
+      currentSheet = name;
+      document.querySelectorAll('#sheet-buttons button').forEach(btn => {
+        btn.className = (btn.innerText === name) ? "btn btn-primary" : "btn btn-outline-primary";
+      });
+      loadData();
     }
 
     function toggleStar(id, event) {
       event.stopPropagation();
-      let starredList = getStarredList();
+      let list = getStarredList();
       const sid = String(id);
-      const index = starredList.indexOf(sid);
-      if (index > -1) { starredList.splice(index, 1); } 
-      else { starredList.push(sid); }
-      localStorage.setItem('starred_words', JSON.stringify(starredList));
+      const i = list.indexOf(sid);
+      if (i > -1) list.splice(i, 1); else list.push(sid);
+      localStorage.setItem('starred_words', JSON.stringify(list));
       render();
     }
 
     function getStarredList() {
-      const starred = localStorage.getItem('starred_words');
-      return starred ? JSON.parse(starred) : [];
+      const s = localStorage.getItem('starred_words');
+      return s ? JSON.parse(s) : [];
     }
 
-    function filterByCategory(selectedCat) {
-      if (selectedCat === "all") {
-        filteredData = allData;
-      } else if (selectedCat === "my_stars") {
-        const starredList = getStarredList();
-        filteredData = allData.filter(item => starredList.includes(String(item.id)));
-      } else {
-        filteredData = allData.filter(item => item.category === selectedCat);
-      }
-      currentPage = 1;
-      render();
+    function filterByCategory(cat) {
+      if (cat === "all") filteredData = allData;
+      else if (cat === "my_stars") {
+        const list = getStarredList();
+        filteredData = allData.filter(item => list.includes(String(item.id)));
+      } else filteredData = allData.filter(item => item.category === cat);
+      currentPage = 1; render();
     }
 
-    function jumpToPage(value) {
-      const newPage = parseInt(value);
-      const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-      if (newPage >= 1 && newPage <= totalPages) { currentPage = newPage; render(); window.scrollTo(0, 0); }
+    function jumpToPage(v) {
+      const p = parseInt(v);
+      const total = Math.ceil(filteredData.length / itemsPerPage);
+      if (p >= 1 && p <= total) { currentPage = p; render(); window.scrollTo(0,0); }
     }
 
-    function changePage(step) { currentPage += step; render(); window.scrollTo(0,0); }
-    function flipCard(element) { element.classList.toggle('is-flipped'); }
-    function playAudio(url, name) {
-      if (!url || url === "null" || url.trim() === "") { alert("目前沒有錄音檔喔！"); return; }
-      const finalUrl = url.trim().replace("dl=0", "raw=1");
-      const audioPlayer = document.getElementById('global-audio');
-      document.getElementById('player-container').style.display = 'block';
-      document.getElementById('current-word').innerText = "播放: " + name;
-      audioPlayer.src = finalUrl;
-      audioPlayer.play().catch(e => console.error(e));
-    }
+    function changePage(s) { currentPage += s; render(); window.scrollTo(0,0); }
+    function flipCard(e) { e.classList.toggle('is-flipped'); }
 
     window.onload = init;
   </script>

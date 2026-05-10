@@ -37,7 +37,17 @@
       transition: all 0.4s ease; /* 讓加高的過程有平滑動畫感 */
     }
 
-
+    /* 專門針對卡片背面的文字內容 */
+    .card-back .text-start {
+      font-size: 1.25rem !important; /* 強制加大到約 20px */
+    }
+    
+    /* 針對內容裡的段落 */
+    .card-back p {
+      font-size: 1.2rem;
+      line-height: 1.6;
+      margin-top: 5px;
+    }
     .card-container { perspective: 1000px; margin-bottom: 20px; position: relative;}
     .word-card {
       width: 100%; min-height: 240px; transition: transform 0.6s, box-shadow 0.3s, border 0.3s;

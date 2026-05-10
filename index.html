@@ -14,17 +14,29 @@
       padding: 15px; 
       padding-bottom: 100px !important;
     }
-    .card-container { perspective: 1000px; margin-bottom: 15px; min-height: 240px; }
+    /* 卡片發亮動畫 */
+    @keyframes pulse-blue {
+      0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+      70% { box-shadow: 0 0 0 15px rgba(0, 123, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+    }
+    .playing-highlight {
+      border: 3px solid #007bff !important;
+      animation: pulse-blue 2s infinite;
+      transform: scale(1.02);
+      z-index: 10;
+    }
+
+    .card-container { perspective: 1000px; margin-bottom: 15px; min-height: 240px; transition: all 0.3s ease; }
     .word-card {
-      width: 100%; min-height: 240px; transition: transform 0.6s;
+      width: 100%; min-height: 240px; transition: transform 0.6s, box-shadow 0.3s;
       transform-style: preserve-3d; position: relative; cursor: pointer;
-      background-color: white; border-radius: 12px;
+      background-color: white; border-radius: 12px; border: 1px solid #ddd;
     }
     .word-card.is-flipped { transform: rotateY(180deg); }
     .card-front, .card-back {
       position: absolute; width: 100%; height: 100%;
       backface-visibility: hidden; border-radius: 12px; padding: 15px;
-      border: 1px solid #ddd; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
       display: flex; flex-direction: column;
     }
     .card-front { border-left: 5px solid #007bff; }
@@ -55,7 +67,7 @@
       width: 35px; height: 35px; display: flex;
       align-items: center; justify-content: center; border: none;
       font-size: 1rem; margin-right: 12px; flex-shrink: 0;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .star-btn { background: none; border: none; font-size: 1.5rem; color: #ccc; cursor: pointer; margin-left: 10px; padding: 0; line-height: 1; }
     .star-btn.active { color: #f1c40f; }
@@ -115,8 +127,6 @@
     let filteredData = [];
     let currentPage = 1;
     const itemsPerPage = 10;
-    
-    // 已更新為您的網址
     const API_URL = "https://script.google.com/macros/s/AKfycbw8C0BLvA-MEi-6yb035L1h2Nc27bH8gKxs9uWoEXUlJ8hqVCwKXegKnj-AbZv6YtQ/exec"; 
 
     let currentSheet = "";
@@ -125,7 +135,6 @@
     let currentIndex = 0;
     let timeCheckInterval; 
 
-    // 初始化：讀取記憶的狀態
     async function init() {
       const savedSheet = localStorage.getItem('last_sheet');
       const savedCategory = localStorage.getItem('last_category') || 'all';
@@ -137,7 +146,6 @@
         if (names && names.length > 0) {
           const btnContainer = document.getElementById('sheet-buttons');
           btnContainer.innerHTML = '';
-          
           currentSheet = (names.includes(savedSheet)) ? savedSheet : names[0];
           currentCategory = savedCategory;
           currentPage = savedPage;
@@ -149,11 +157,10 @@
             btn.onclick = () => switchSheet(name);
             btnContainer.appendChild(btn);
           });
-          
           loadData();
         }
       } catch (err) {
-        document.getElementById('app').innerHTML = "連線失敗，請檢查 API 網址是否正確。";
+        document.getElementById('app').innerHTML = "連線失敗。";
       }
     }
 
@@ -177,10 +184,8 @@
         });
 
         applyFilter();
-
         const maxPage = Math.ceil(filteredData.length / itemsPerPage);
         if (currentPage > maxPage && maxPage > 0) currentPage = 1;
-
         render();
       } catch (err) {
         document.getElementById('app').innerHTML = "資料載入出錯。";
@@ -188,14 +193,11 @@
     }
 
     function applyFilter() {
-      if (currentCategory === "all") {
-        filteredData = allData;
-      } else if (currentCategory === "my_stars") {
+      if (currentCategory === "all") filteredData = allData;
+      else if (currentCategory === "my_stars") {
         const list = getStarredList();
         filteredData = allData.filter(item => list.includes(String(item.id)));
-      } else {
-        filteredData = allData.filter(item => item.category === currentCategory);
-      }
+      } else filteredData = allData.filter(item => item.category === currentCategory);
       localStorage.setItem('last_category', currentCategory);
     }
 
@@ -224,11 +226,11 @@
         if (item.category) posBadges += `<span class="badge bg-cat">${item.category}</span>`;
 
         html += `
-          <div class="card-container">
-            <div class="word-card ${starredCardClass}" onclick="flipCard(this)">
+          <div class="card-container" id="container-${item.id}">
+            <div class="word-card ${starredCardClass}" id="card-${item.id}" onclick="flipCard(this)">
               <div class="card-front">
                 <div class="word-header">
-                  <button class="play-icon-btn" onclick="event.stopPropagation(); playAudio('${item.audioUrl}', '${item.word}', '${item.timeRange}')">▶</button>
+                  <button class="play-icon-btn" onclick="event.stopPropagation(); playAudio('${item.audioUrl}', '${item.word}', '${item.timeRange}', '${item.id}')">▶</button>
                   <span class="word-title">${item.word}</span>
                   <button class="star-btn ${starClass}" onclick="toggleStar('${item.id}', event)">★</button>
                   <span class="word-no">#${item.id}</span>
@@ -260,43 +262,31 @@
       document.getElementById('nextBtn').disabled = (currentPage >= totalPages || totalPages === 0);
     }
 
-    function switchSheet(name) {
-      if (currentSheet === name) return;
-      currentSheet = name;
-      currentPage = 1;
-      currentCategory = "all"; 
-      
-      localStorage.setItem('last_sheet', name);
-      localStorage.setItem('last_page', 1);
-      localStorage.setItem('last_category', 'all');
-
-      document.querySelectorAll('#sheet-buttons button').forEach(btn => {
-        btn.className = (btn.innerText === name) ? "btn btn-primary" : "btn btn-outline-primary";
-      });
-      loadData();
-    }
-
-    function filterByCategory(cat) {
-      currentCategory = cat;
-      currentPage = 1; 
-      applyFilter();
-      render();
-    }
-
-    function playAudio(url, name, timeRange) {
+    // 播放邏輯核心 (新增捲動與高亮)
+    function playAudio(url, name, timeRange, id) {
       const audioPlayer = document.getElementById('global-audio');
       audioPlayer.onended = null; 
       clearInterval(timeCheckInterval); 
+
+      // 移除所有舊的高亮
+      document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
+
+      // 執行高亮與自動捲動
+      const targetCard = document.getElementById('card-' + id);
+      if (targetCard) {
+        targetCard.classList.add('playing-highlight');
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       
       if (!url || url === "null" || url.trim() === "") { 
-        alert("目前沒有錄音檔喔！"); 
-        if (currentPlaylist.length > 0) handleAutoNext(); 
+        console.log("無音檔，跳過");
+        if (currentPlaylist.length > 0) setTimeout(handleAutoNext, 1000); 
         return; 
       }
 
       const finalUrl = url.trim().replace("dl=0", "raw=1");
       document.getElementById('player-container').style.display = 'block';
-      document.getElementById('current-word').innerText = "準備中: " + name;
+      document.getElementById('current-word').innerText = "播放中: " + name;
       
       let startTime = 0, endTime = 0;
       if (timeRange && typeof timeRange === 'string' && timeRange.includes('-')) {
@@ -309,7 +299,6 @@
       audioPlayer.load();
       audioPlayer.onloadedmetadata = function() {
         if (startTime > 0) audioPlayer.currentTime = startTime;
-        document.getElementById('current-word').innerText = "播放中: " + name;
         audioPlayer.play().then(() => {
           if (endTime > startTime) {
             timeCheckInterval = setInterval(() => {
@@ -329,10 +318,12 @@
       if (currentPlaylist.length > 0 && currentIndex < currentPlaylist.length - 1) {
         currentIndex++;
         const item = currentPlaylist[currentIndex];
-        playAudio(item.audioUrl, item.word, item.timeRange);
+        playAudio(item.audioUrl, item.word, item.timeRange, item.id);
       } else if (currentPlaylist.length > 0) {
         document.getElementById('current-word').innerText = "✅ 全頁播放完畢";
         currentPlaylist = [];
+        // 播放完畢移除高亮
+        document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
       }
     }
 
@@ -341,7 +332,30 @@
       currentPlaylist = filteredData.slice(start, start + itemsPerPage);
       if (currentPlaylist.length === 0) return alert("無資料");
       currentIndex = 0;
-      playAudio(currentPlaylist[0].audioUrl, currentPlaylist[0].word, currentPlaylist[0].timeRange);
+      const first = currentPlaylist[0];
+      playAudio(first.audioUrl, first.word, first.timeRange, first.id);
+    }
+
+    // 其餘輔助功能
+    function switchSheet(name) {
+      if (currentSheet === name) return;
+      currentSheet = name;
+      currentPage = 1;
+      currentCategory = "all"; 
+      localStorage.setItem('last_sheet', name);
+      localStorage.setItem('last_page', 1);
+      localStorage.setItem('last_category', 'all');
+      document.querySelectorAll('#sheet-buttons button').forEach(btn => {
+        btn.className = (btn.innerText === name) ? "btn btn-primary" : "btn btn-outline-primary";
+      });
+      loadData();
+    }
+
+    function filterByCategory(cat) {
+      currentCategory = cat;
+      currentPage = 1; 
+      applyFilter();
+      render();
     }
 
     function toggleStar(id, event) {

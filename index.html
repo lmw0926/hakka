@@ -263,27 +263,45 @@
     }
 
     // 播放邏輯核心 (新增捲動與高亮)
+    /** * 優化後的播放邏輯核心 (加強自動捲動與高亮)
+     */
     function playAudio(url, name, timeRange, id) {
       const audioPlayer = document.getElementById('global-audio');
       audioPlayer.onended = null; 
       clearInterval(timeCheckInterval); 
-
-      // 移除所有舊的高亮
-      document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
-
-      // 執行高亮與自動捲動
+    
+      // 1. 移除所有舊的高亮狀態
+      document.querySelectorAll('.word-card').forEach(c => {
+        c.classList.remove('playing-highlight');
+      });
+    
+      // 2. 執行高亮與自動捲動 (加入延遲確保效果觸發)
       const targetCard = document.getElementById('card-' + id);
       if (targetCard) {
         targetCard.classList.add('playing-highlight');
-        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // 使用延遲確保 DOM 完全更新後才執行捲動
+        setTimeout(() => {
+          targetCard.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center', // 讓卡片出現在畫面正中央
+            inline: 'nearest' 
+          });
+        }, 100); 
       }
       
+      // 3. 處理無音檔的情況
       if (!url || url === "null" || url.trim() === "") { 
-        console.log("無音檔，跳過");
-        if (currentPlaylist.length > 0) setTimeout(handleAutoNext, 1000); 
+        console.log("無音檔，準備跳過...");
+        document.getElementById('current-word').innerText = "跳過無音檔: " + name;
+        // 如果在循序播放中，等待 1.5 秒後跳下一首
+        if (currentPlaylist.length > 0) {
+          setTimeout(handleAutoNext, 1500); 
+        }
         return; 
       }
-
+    
+      // 4. 正式播放逻辑
       const finalUrl = url.trim().replace("dl=0", "raw=1");
       document.getElementById('player-container').style.display = 'block';
       document.getElementById('current-word').innerText = "播放中: " + name;
@@ -308,8 +326,14 @@
                 handleAutoNext(); 
               }
             }, 100);
-          } else { audioPlayer.onended = () => handleAutoNext(); }
-        }).catch(e => console.error("播放錯誤:", e));
+          } else { 
+            audioPlayer.onended = () => handleAutoNext(); 
+          }
+        }).catch(e => {
+          console.error("播放錯誤:", e);
+          // 遇到自動播放受限時，依然嘗試跳下一首
+          if (currentPlaylist.length > 0) handleAutoNext();
+        });
         audioPlayer.onloadedmetadata = null;
       };
     }

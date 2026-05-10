@@ -64,30 +64,35 @@
       background: #f1f3f5; padding: 10px; border-left: 4px solid #3498db;
       font-size: 1.5rem; color: #34495e; border-radius: 0 4px 4px 0;
       flex-grow: 1; overflow-y: auto;
-      transition: all 0.4s ease-in-out; /* 增加動畫效果 */
-      cursor: zoom-in; /* 滑鼠游標顯示放大圖示 */
+      transition: all 0.4s ease-in-out;
+      cursor: zoom-in;
       position: relative;
+      text-align: left; /* 強制內容靠左對齊，覆蓋父層 center */
     }
 
-    /* *** 新增：例句框放大樣式 *** */
+    /* 例句框放大樣式 */
     .example-box.expanded {
       position: absolute;
-      top: 10px;    /* 留一點邊距 */
-      left: 10px;
-      right: 10px;
-      bottom: 10px;
-      z-index: 100; /* 確保在最上層 */
-      background: rgba(241, 243, 245, 0.98); /* 稍微不透明 */
+      top: 10px; left: 10px; right: 10px; bottom: 10px;
+      z-index: 100;
+      background: rgba(241, 243, 245, 0.98);
       border: 2px solid #3498db;
       border-radius: 8px;
       padding: 20px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-      cursor: zoom-out; /* 放大後游標顯示縮小圖示 */
-      overflow-y: auto; /* 內容過長可捲動 */
-      flex-grow: 0; /* 關閉原本的 flex 生長 */
+      cursor: zoom-out;
+      overflow-y: auto;
+      flex-grow: 0;
     }
 
-    .example-label { font-size: 0.8rem; color: #7f8c8d; display: block; margin-bottom: 3px; font-weight: bold; }
+    /* 關鍵：讓標題靠左且不佔整行 */
+    .example-label { 
+      font-size: 0.9rem; 
+      color: #7f8c8d; 
+      display: inline; /* 改為 inline 就不會強迫換行 */
+      margin-right: 5px; 
+      font-weight: bold; 
+    }
     
     .play-icon-btn {
       background: #007bff; color: white; border-radius: 50%;
@@ -252,7 +257,6 @@
         if (item.pos2) posBadges += `<span class="badge bg-pos">${item.pos2}</span>`;
         if (item.category) posBadges += `<span class="badge bg-cat">${item.category}</span>`;
 
-        // 在 example-box 加上 toggleExampleExpansion(this, event) 點擊事件
         html += `
           <div class="col-12 col-md-6 card-container">
             <div class="word-card ${starredCardClass}" id="card-${item.id}" onclick="flipCard(this)">
@@ -285,20 +289,12 @@
       localStorage.setItem('last_page', currentPage);
     }
 
-    /* *** 新增：控制例句框放大的函式 *** */
     function toggleExampleExpansion(element, event) {
-      // 1. 阻止事件冒泡：重要！防止點擊例句時卡片跟著翻轉
       event.stopPropagation();
-
-      // 2. 如果點擊的是已經放大的框，則縮小它
       if (element.classList.contains('expanded')) {
         element.classList.remove('expanded');
       } else {
-        // 3. 先關閉頁面上其他可能已經放大的例句框（確保一次只放大一個）
-        document.querySelectorAll('.example-box.expanded').forEach(box => {
-          box.classList.remove('expanded');
-        });
-        // 4. 放大當前點擊的框
+        document.querySelectorAll('.example-box.expanded').forEach(box => box.classList.remove('expanded'));
         element.classList.add('expanded');
       }
     }
@@ -315,9 +311,7 @@
       audioPlayer.onended = null; 
       clearInterval(timeCheckInterval); 
 
-      // 播放時，關閉所有放大的例句框，避免干擾視覺
       document.querySelectorAll('.example-box.expanded').forEach(box => box.classList.remove('expanded'));
-
       document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
 
       const targetCard = document.getElementById('card-' + id);
@@ -438,9 +432,7 @@
 
     function fixMissingCharacters() { if (typeof CNS11643 !== 'undefined') { setTimeout(() => { CNS11643.fixed(); }, 150); } }
     
-    // 修改 flipCard，防止在例句框放大時觸發翻面
     function flipCard(cardElement) { 
-      // 如果卡片內有放大的例句框，則不觸發翻面
       if (cardElement.querySelector('.example-box.expanded')) {
         return;
       }

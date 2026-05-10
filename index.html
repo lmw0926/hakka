@@ -28,7 +28,7 @@
       display: flex; flex-direction: column;
     }
     .card-front { border-left: 5px solid #007bff; }
-    .card-back { transform: rotateY(180deg); background: #f0f7ff; border-left: 5px solid #28a745; }
+    .card-back { transform: rotateY(180deg); background: #f0f7ff; border-left: 5px solid #28a745; overflow-y: auto; }
     
     .word-card.starred-border { background-color: #fffdf0 !important; }
     .word-card.starred-border .card-front { border-left: 5px solid #f1c40f; }
@@ -68,9 +68,6 @@
     .player-flex { display: flex; align-items: center; gap: 10px; }
     #current-word { font-weight: bold; font-size: 0.9rem; min-width: 80px; }
     audio { flex-grow: 1; height: 35px; }
-
-    /* 修復卡片背後文字過長溢出 */
-    .card-back { overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -118,33 +115,45 @@
     let filteredData = [];
     let currentPage = 1;
     const itemsPerPage = 10;
-    // 請確保此網址正確
+    
+    // 已更新為您的網址
     const API_URL = "https://script.google.com/macros/s/AKfycbw8C0BLvA-MEi-6yb035L1h2Nc27bH8gKxs9uWoEXUlJ8hqVCwKXegKnj-AbZv6YtQ/exec"; 
 
     let currentSheet = "";
+    let currentCategory = "all";
     let currentPlaylist = [];
     let currentIndex = 0;
     let timeCheckInterval; 
 
+    // 初始化：讀取記憶的狀態
     async function init() {
+      const savedSheet = localStorage.getItem('last_sheet');
+      const savedCategory = localStorage.getItem('last_category') || 'all';
+      const savedPage = parseInt(localStorage.getItem('last_page')) || 1;
+
       try {
         const response = await fetch(`${API_URL}?action=getSheets`);
         const names = await response.json();
         if (names && names.length > 0) {
           const btnContainer = document.getElementById('sheet-buttons');
           btnContainer.innerHTML = '';
-          names.forEach((name, index) => {
+          
+          currentSheet = (names.includes(savedSheet)) ? savedSheet : names[0];
+          currentCategory = savedCategory;
+          currentPage = savedPage;
+
+          names.forEach((name) => {
             const btn = document.createElement('button');
             btn.innerText = name;
-            btn.className = (index === 0) ? "btn btn-primary" : "btn btn-outline-primary";
+            btn.className = (name === currentSheet) ? "btn btn-primary" : "btn btn-outline-primary";
             btn.onclick = () => switchSheet(name);
             btnContainer.appendChild(btn);
           });
-          currentSheet = names[0];
+          
           loadData();
         }
       } catch (err) {
-        document.getElementById('app').innerHTML = "連線失敗，請檢查網路。";
+        document.getElementById('app').innerHTML = "連線失敗，請檢查 API 網址是否正確。";
       }
     }
 
@@ -163,90 +172,40 @@
         categories.forEach(cat => {
           const opt = document.createElement('option');
           opt.value = opt.innerText = cat;
+          if (cat === currentCategory) opt.selected = true;
           select.appendChild(opt);
         });
 
-        filteredData = allData;
-        currentPage = 1;
+        applyFilter();
+
+        const maxPage = Math.ceil(filteredData.length / itemsPerPage);
+        if (currentPage > maxPage && maxPage > 0) currentPage = 1;
+
         render();
       } catch (err) {
         document.getElementById('app').innerHTML = "資料載入出錯。";
       }
     }
 
-    function playAudio(url, name, timeRange) {
-      const audioPlayer = document.getElementById('global-audio');
-      audioPlayer.onended = null; 
-      clearInterval(timeCheckInterval); 
-    
-      if (!url || url === "null" || url.trim() === "") { 
-        alert("目前沒有錄音檔喔！"); 
-        // 如果是在循序播放中，跳過這首
-        if (currentPlaylist.length > 0) handleAutoNext();
-        return; 
+    function applyFilter() {
+      if (currentCategory === "all") {
+        filteredData = allData;
+      } else if (currentCategory === "my_stars") {
+        const list = getStarredList();
+        filteredData = allData.filter(item => list.includes(String(item.id)));
+      } else {
+        filteredData = allData.filter(item => item.category === currentCategory);
       }
-      
-      const finalUrl = url.trim().replace("dl=0", "raw=1");
-      document.getElementById('player-container').style.display = 'block';
-      document.getElementById('current-word').innerText = "準備中: " + name;
-      
-      let startTime = 0;
-      let endTime = 0;
-      if (timeRange && typeof timeRange === 'string' && timeRange.includes('-')) {
-        const parts = timeRange.split('-');
-        startTime = parseFloat(parts[0]) || 0;
-        endTime = parseFloat(parts[1]) || 0;
-      }
-    
-      audioPlayer.src = finalUrl;
-      audioPlayer.load();
-    
-      audioPlayer.onloadedmetadata = function() {
-        if (startTime > 0) audioPlayer.currentTime = startTime;
-        document.getElementById('current-word').innerText = "播放中: " + name;
-        
-        audioPlayer.play().then(() => {
-          if (endTime > startTime) {
-            timeCheckInterval = setInterval(() => {
-              if (audioPlayer.currentTime >= endTime) {
-                audioPlayer.pause();
-                clearInterval(timeCheckInterval);
-                handleAutoNext();
-              }
-            }, 100);
-          } else {
-            // 無區段限制，使用原生的 onended
-            audioPlayer.onended = () => handleAutoNext();
-          }
-        }).catch(e => console.error("播放錯誤:", e));
-        audioPlayer.onloadedmetadata = null;
-      };
-    }
-
-    function handleAutoNext() {
-      if (currentPlaylist.length > 0 && currentIndex < currentPlaylist.length - 1) {
-        currentIndex++;
-        const item = currentPlaylist[currentIndex];
-        playAudio(item.audioUrl, item.word, item.timeRange);
-      } else if (currentPlaylist.length > 0) {
-        document.getElementById('current-word').innerText = "✅ 播放完畢";
-        currentPlaylist = []; // 清空播放清單
-      }
-    }
-
-    function playAllOnPage() {
-      const start = (currentPage - 1) * itemsPerPage;
-      const end = start + itemsPerPage;
-      currentPlaylist = filteredData.slice(start, end);
-
-      if (currentPlaylist.length === 0) return alert("無資料");
-      currentIndex = 0;
-      playAudio(currentPlaylist[0].audioUrl, currentPlaylist[0].word, currentPlaylist[0].timeRange);
+      localStorage.setItem('last_category', currentCategory);
     }
 
     function render() {
       const app = document.getElementById('app');
-      if (!filteredData || filteredData.length === 0) { app.innerHTML = "目前沒有資料。"; return; }
+      if (!filteredData || filteredData.length === 0) { 
+        app.innerHTML = "目前沒有資料。"; 
+        updatePagination(0);
+        return; 
+      }
 
       const start = (currentPage - 1) * itemsPerPage;
       const pagedData = filteredData.slice(start, start + itemsPerPage);
@@ -259,7 +218,6 @@
         const starClass = isStarred ? 'active' : '';
         const starredCardClass = isStarred ? 'starred-border' : '';
         
-        // 組合詞性 (pos1, pos2)
         let posBadges = '';
         if (item.pos1) posBadges += `<span class="badge bg-pos">${item.pos1}</span>`;
         if (item.pos2) posBadges += `<span class="badge bg-pos">${item.pos2}</span>`;
@@ -277,47 +235,113 @@
                 </div>
                 <div class="pinyin" style="margin-left: 47px;">${item.pinyin || ''}</div>
                 <div class="badge-group" style="margin-left: 47px;">${posBadges}</div>
-                <div class="example-box">
-                  <span class="example-label">例句：</span>${item.example || '（暫無例句）'}
-                </div>
+                <div class="example-box"><span class="example-label">例句：</span>${item.example || '（暫無例句）'}</div>
               </div>
               <div class="card-back">
                 <div class="word-header"><span class="word-title" style="color:#28a745;">解釋與翻譯</span></div>
-                <div class="mt-2 text-start small">
-                  <strong>華語詞義：</strong>
-                  <p>${item.meaning || '無資料'}</p>
-                </div>
+                <div class="mt-2 text-start small"><strong>華語詞義：</strong><p>${item.meaning || ''}</p></div>
                 <hr class="my-2">
-                <div class="text-start small text-secondary">
-                  <strong>翻譯 / 備註：</strong>
-                  <p>${item.translation || '無'}</p>
-                </div>
+                <div class="text-start small text-secondary"><strong>翻譯/備註：</strong><p>${item.translation || ''}</p></div>
               </div>
             </div>
           </div>`;
       });
       
       app.innerHTML = html;
-      document.getElementById('pageInput').value = currentPage;
-      document.getElementById('totalPages').innerText = `/ ${totalPages} 頁`;
-      document.getElementById('prevBtn').disabled = (currentPage === 1);
-      document.getElementById('nextBtn').disabled = (currentPage === totalPages || totalPages === 0);
-      
+      updatePagination(totalPages);
       fixMissingCharacters();
+      localStorage.setItem('last_page', currentPage);
     }
 
-    function fixMissingCharacters() {
-      if (typeof CNS11643 !== 'undefined') {
-        setTimeout(() => { CNS11643.fixed(); }, 150);
-      }
+    function updatePagination(totalPages) {
+      document.getElementById('pageInput').value = currentPage;
+      document.getElementById('totalPages').innerText = `/ ${totalPages} 頁`;
+      document.getElementById('prevBtn').disabled = (currentPage <= 1);
+      document.getElementById('nextBtn').disabled = (currentPage >= totalPages || totalPages === 0);
     }
 
     function switchSheet(name) {
+      if (currentSheet === name) return;
       currentSheet = name;
+      currentPage = 1;
+      currentCategory = "all"; 
+      
+      localStorage.setItem('last_sheet', name);
+      localStorage.setItem('last_page', 1);
+      localStorage.setItem('last_category', 'all');
+
       document.querySelectorAll('#sheet-buttons button').forEach(btn => {
         btn.className = (btn.innerText === name) ? "btn btn-primary" : "btn btn-outline-primary";
       });
       loadData();
+    }
+
+    function filterByCategory(cat) {
+      currentCategory = cat;
+      currentPage = 1; 
+      applyFilter();
+      render();
+    }
+
+    function playAudio(url, name, timeRange) {
+      const audioPlayer = document.getElementById('global-audio');
+      audioPlayer.onended = null; 
+      clearInterval(timeCheckInterval); 
+      
+      if (!url || url === "null" || url.trim() === "") { 
+        alert("目前沒有錄音檔喔！"); 
+        if (currentPlaylist.length > 0) handleAutoNext(); 
+        return; 
+      }
+
+      const finalUrl = url.trim().replace("dl=0", "raw=1");
+      document.getElementById('player-container').style.display = 'block';
+      document.getElementById('current-word').innerText = "準備中: " + name;
+      
+      let startTime = 0, endTime = 0;
+      if (timeRange && typeof timeRange === 'string' && timeRange.includes('-')) {
+        const parts = timeRange.split('-');
+        startTime = parseFloat(parts[0]) || 0;
+        endTime = parseFloat(parts[1]) || 0;
+      }
+      
+      audioPlayer.src = finalUrl;
+      audioPlayer.load();
+      audioPlayer.onloadedmetadata = function() {
+        if (startTime > 0) audioPlayer.currentTime = startTime;
+        document.getElementById('current-word').innerText = "播放中: " + name;
+        audioPlayer.play().then(() => {
+          if (endTime > startTime) {
+            timeCheckInterval = setInterval(() => {
+              if (audioPlayer.currentTime >= endTime) { 
+                audioPlayer.pause(); 
+                clearInterval(timeCheckInterval); 
+                handleAutoNext(); 
+              }
+            }, 100);
+          } else { audioPlayer.onended = () => handleAutoNext(); }
+        }).catch(e => console.error("播放錯誤:", e));
+        audioPlayer.onloadedmetadata = null;
+      };
+    }
+
+    function handleAutoNext() {
+      if (currentPlaylist.length > 0 && currentIndex < currentPlaylist.length - 1) {
+        currentIndex++;
+        const item = currentPlaylist[currentIndex];
+        playAudio(item.audioUrl, item.word, item.timeRange);
+      } else if (currentPlaylist.length > 0) {
+        document.getElementById('current-word').innerText = "✅ 全頁播放完畢";
+        currentPlaylist = [];
+      }
+    }
+
+    function playAllOnPage() {
+      const start = (currentPage - 1) * itemsPerPage;
+      currentPlaylist = filteredData.slice(start, start + itemsPerPage);
+      if (currentPlaylist.length === 0) return alert("無資料");
+      currentIndex = 0;
+      playAudio(currentPlaylist[0].audioUrl, currentPlaylist[0].word, currentPlaylist[0].timeRange);
     }
 
     function toggleStar(id, event) {
@@ -335,35 +359,19 @@
       return s ? JSON.parse(s) : [];
     }
 
-    function filterByCategory(cat) {
-      if (cat === "all") {
-        filteredData = allData;
-      } else if (cat === "my_stars") {
-        const list = getStarredList();
-        filteredData = allData.filter(item => list.includes(String(item.id)));
-      } else {
-        filteredData = allData.filter(item => item.category === cat);
-      }
-      currentPage = 1; 
-      render();
-    }
-
     function jumpToPage(v) {
       const p = parseInt(v);
       const total = Math.ceil(filteredData.length / itemsPerPage);
       if (p >= 1 && p <= total) { currentPage = p; render(); window.scrollTo(0,0); }
     }
 
-    function changePage(s) { 
+    function changePage(s) {
       const total = Math.ceil(filteredData.length / itemsPerPage);
       const nextP = currentPage + s;
-      if (nextP >= 1 && nextP <= total) {
-        currentPage = nextP; 
-        render(); 
-        window.scrollTo(0,0); 
-      }
+      if (nextP >= 1 && nextP <= total) { currentPage = nextP; render(); window.scrollTo(0,0); }
     }
-    
+
+    function fixMissingCharacters() { if (typeof CNS11643 !== 'undefined') { setTimeout(() => { CNS11643.fixed(); }, 150); } }
     function flipCard(e) { e.classList.toggle('is-flipped'); }
 
     window.onload = init;

@@ -28,26 +28,24 @@
       transform: scale(1.02);
       z-index: 10;
       background-color: #eef7ff !important;
-      min-height: 360px !important; /* 卡片本體也隨之更明顯加高240px * 1.5 = 360px */
+      min-height: 360px !important; 
     }
-    /* 當卡片處於播放中狀態時，調整內部例句框的高度 */
     .playing-highlight .example-box {
-      min-height: 200px; /* 設定一個較大的最小高度 */
-      max-height: 400px; /* 防止過度膨脹 */
-      transition: all 0.4s ease; /* 讓加高的過程有平滑動畫感 */
+      min-height: 200px;
+      max-height: 400px;
+      transition: all 0.4s ease;
     }
 
-    /* 專門針對卡片背面的文字內容 */
+    /* 調整背景字體大小 */
     .card-back .text-start {
-      font-size: 1.25rem !important; /* 強制加大到約 20px */
+      font-size: 1.25rem !important; 
     }
-    
-    /* 針對內容裡的段落 */
     .card-back p {
       font-size: 1.2rem;
       line-height: 1.6;
       margin-top: 5px;
     }
+
     .card-container { perspective: 1000px; margin-bottom: 20px; position: relative;}
     .word-card {
       width: 100%; min-height: 240px; transition: transform 0.6s, box-shadow 0.3s, border 0.3s;
@@ -76,10 +74,9 @@
     .bg-pos { background-color: #3498db; } 
     .bg-cat { background-color: #2ecc71; }
     
-    /* 例句框基礎樣式 */
     .example-box {
       background: #f1f3f5; 
-      padding: 8px 10px;    /* 稍微縮小頂部 padding (原為 10px) */
+      padding: 8px 10px;
       border-left: 4px solid #3498db;
       font-size: 1.5rem; 
       color: #34495e; 
@@ -90,10 +87,9 @@
       cursor: zoom-in;
       position: relative;
       text-align: left;
-      line-height: 1.4;      /* 明確設定行高，避免預設行高過大 */
+      line-height: 1.4;
     }
 
-    /* 例句框放大樣式 */
     .example-box.expanded {
       position: absolute;
       top: 10px; left: 10px; right: 10px; bottom: 10px;
@@ -108,11 +104,10 @@
       flex-grow: 0;
     }
 
-    /* 關鍵：讓標題靠左且不佔整行 */
     .example-label { 
       font-size: 0.9rem; 
       color: #7f8c8d; 
-      display: inline; /* 改為 inline 就不會強迫換行 */
+      display: inline;
       margin-right: 5px; 
       font-weight: bold; 
     }
@@ -143,6 +138,9 @@
   <div class="d-grid gap-2 mb-3">
     <button id="playAllBtn" class="btn btn-success" onclick="playAllOnPage()">
       🎧 播放本頁所有音檔 (循序播放)
+    </button>
+    <button id="playEverythingBtn" class="btn btn-warning" onclick="playAllContinuous()">
+      🚀 自動換頁播放 (從第一張播到最後一張)
     </button>
   </div>
 
@@ -189,6 +187,7 @@
     let currentPlaylist = [];
     let currentIndex = 0;
     let timeCheckInterval; 
+    let isAutoPlayingAll = false; // 追蹤是否為跨頁播放模式
 
     async function init() {
       const savedSheet = localStorage.getItem('last_sheet');
@@ -295,7 +294,7 @@
                 <div class="example-box" onclick="toggleExampleExpansion(this, event)"><span class="example-label">例句：</span>${item.example || '（暫無例句）'}</div>
               </div>
               <div class="card-back">
-                <div class="word-header"><span style="color:#28a745;">解釋與翻譯</span></div>
+                <div class="word-header"><span style="color:#28a745; font-weight:bold;">解釋與翻譯</span></div>
                 <div class="mt-2 text-start small"><strong>華語詞義：</strong><p>${item.meaning || ''}</p></div>
                 <hr class="my-2">
                 <div class="text-start small text-secondary"><strong>翻譯/備註：</strong><p>${item.translation || ''}</p></div>
@@ -310,53 +309,29 @@
       localStorage.setItem('last_page', currentPage);
     }
 
-    function toggleExampleExpansion(element, event) {
-      event.stopPropagation();
-      if (element.classList.contains('expanded')) {
-        element.classList.remove('expanded');
-      } else {
-        document.querySelectorAll('.example-box.expanded').forEach(box => box.classList.remove('expanded'));
-        element.classList.add('expanded');
-      }
-    }
-
-    function updatePagination(totalPages) {
-      document.getElementById('pageInput').value = currentPage;
-      document.getElementById('totalPages').innerText = `/ ${totalPages} 頁`;
-      document.getElementById('prevBtn').disabled = (currentPage <= 1);
-      document.getElementById('nextBtn').disabled = (currentPage >= totalPages || totalPages === 0);
-    }
-
     function playAudio(url, name, timeRange, id) {
       const audioPlayer = document.getElementById('global-audio');
       audioPlayer.onended = null; 
       clearInterval(timeCheckInterval); 
-    
-      // --- 新增邏輯：如果在全頁播放模式下點擊特定卡片，更新播放進度 ---
+
+      // 同步播放進度
       if (currentPlaylist.length > 0) {
-        const foundIndex = currentPlaylist.findIndex(item => String(item.id) === String(id));
-        if (foundIndex !== -1) {
-          currentIndex = foundIndex; // 將播放進度跳轉到點擊的這一張
-        }
+        const idx = currentPlaylist.findIndex(item => String(item.id) === String(id));
+        if (idx !== -1) currentIndex = idx;
       }
-      // -------------------------------------------------------
-    
+
       document.querySelectorAll('.example-box.expanded').forEach(box => box.classList.remove('expanded'));
       document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
     
       const targetCard = document.getElementById('card-' + id);
       if (targetCard) {
         targetCard.classList.add('playing-highlight');
-        setTimeout(() => {
-          targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 150);
+        setTimeout(() => targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
       }
       
       if (!url || url === "null" || url.trim() === "") { 
-        document.getElementById('current-word').innerText = "跳過無音檔: " + name;
-        if (currentPlaylist.length > 0) {
-          setTimeout(handleAutoNext, 1200); 
-        }
+        document.getElementById('current-word').innerText = "無音檔: " + name;
+        if (currentPlaylist.length > 0) setTimeout(handleAutoNext, 1000);
         return; 
       }
     
@@ -388,53 +363,100 @@
             audioPlayer.onended = () => handleAutoNext(); 
           }
         }).catch(e => {
-            console.error("播放受限", e);
-            if (currentPlaylist.length > 0) handleAutoNext();
+          console.error("播放受限", e);
+          if (currentPlaylist.length > 0) handleAutoNext();
         });
         audioPlayer.onloadedmetadata = null;
       };
     }
 
     function handleAutoNext() {
+      // 1. 本頁還有下一張
       if (currentPlaylist.length > 0 && currentIndex < currentPlaylist.length - 1) {
         currentIndex++;
         const item = currentPlaylist[currentIndex];
         playAudio(item.audioUrl, item.word, item.timeRange, item.id);
-      } else if (currentPlaylist.length > 0) {
-        document.getElementById('current-word').innerText = "✅ 完畢";
-        currentPlaylist = [];
-        document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
+      } 
+      // 2. 本頁播完，檢查是否要自動換下一頁
+      else if (isAutoPlayingAll) {
+        const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+        if (currentPage < totalPages) {
+          document.getElementById('current-word').innerText = "⏩ 準備翻至下頁...";
+          setTimeout(() => {
+            changePage(1); // 換頁
+            setTimeout(() => {
+                // 翻頁後重新獲取清單並從第一個開始播
+                const start = (currentPage - 1) * itemsPerPage;
+                currentPlaylist = filteredData.slice(start, start + itemsPerPage);
+                currentIndex = 0;
+                if (currentPlaylist.length > 0) {
+                    const first = currentPlaylist[0];
+                    playAudio(first.audioUrl, first.word, first.timeRange, first.id);
+                }
+            }, 500); // 等待 DOM 渲染完畢
+          }, 1500);
+        } else {
+          finishPlaying();
+        }
+      } 
+      // 3. 播完了
+      else {
+        finishPlaying();
       }
     }
 
+    function finishPlaying() {
+      document.getElementById('current-word').innerText = "✅ 全部播放完畢";
+      currentPlaylist = [];
+      isAutoPlayingAll = false;
+      document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
+    }
+
     function playAllOnPage() {
+      isAutoPlayingAll = false; // 單頁播放模式
       const start = (currentPage - 1) * itemsPerPage;
       currentPlaylist = filteredData.slice(start, start + itemsPerPage);
       if (currentPlaylist.length === 0) return alert("無資料");
       currentIndex = 0;
-      const first = currentPlaylist[0];
-      playAudio(first.audioUrl, first.word, first.timeRange, first.id);
+      playAudio(currentPlaylist[0].audioUrl, currentPlaylist[0].word, currentPlaylist[0].timeRange, currentPlaylist[0].id);
+    }
+
+    function playAllContinuous() {
+      isAutoPlayingAll = true; // 開啟跨頁播放模式
+      const start = (currentPage - 1) * itemsPerPage;
+      currentPlaylist = filteredData.slice(start, start + itemsPerPage);
+      if (currentPlaylist.length === 0) return alert("無資料");
+      currentIndex = 0;
+      playAudio(currentPlaylist[0].audioUrl, currentPlaylist[0].word, currentPlaylist[0].timeRange, currentPlaylist[0].id);
+    }
+
+    // --- 以下為原有功能支援函式 ---
+
+    function toggleExampleExpansion(element, event) {
+      event.stopPropagation();
+      if (element.classList.contains('expanded')) element.classList.remove('expanded');
+      else {
+        document.querySelectorAll('.example-box.expanded').forEach(box => box.classList.remove('expanded'));
+        element.classList.add('expanded');
+      }
+    }
+
+    function updatePagination(totalPages) {
+      document.getElementById('pageInput').value = currentPage;
+      document.getElementById('totalPages').innerText = `/ ${totalPages} 頁`;
+      document.getElementById('prevBtn').disabled = (currentPage <= 1);
+      document.getElementById('nextBtn').disabled = (currentPage >= totalPages || totalPages === 0);
     }
 
     function switchSheet(name) {
       if (currentSheet === name) return;
-      currentSheet = name;
-      currentPage = 1;
-      currentCategory = "all"; 
+      currentSheet = name; currentPage = 1; currentCategory = "all"; 
       localStorage.setItem('last_sheet', name);
-      localStorage.setItem('last_page', 1);
-      localStorage.setItem('last_category', 'all');
-      document.querySelectorAll('#sheet-buttons button').forEach(btn => {
-        btn.className = (btn.innerText === name) ? "btn btn-primary" : "btn btn-outline-primary";
-      });
       loadData();
     }
 
     function filterByCategory(cat) {
-      currentCategory = cat;
-      currentPage = 1; 
-      applyFilter();
-      render();
+      currentCategory = cat; currentPage = 1; applyFilter(); render();
     }
 
     function toggleStar(id, event) {
@@ -467,9 +489,7 @@
     function fixMissingCharacters() { if (typeof CNS11643 !== 'undefined') { setTimeout(() => { CNS11643.fixed(); }, 150); } }
     
     function flipCard(cardElement) { 
-      if (cardElement.querySelector('.example-box.expanded')) {
-        return;
-      }
+      if (cardElement.querySelector('.example-box.expanded')) return;
       cardElement.classList.toggle('is-flipped'); 
     }
 

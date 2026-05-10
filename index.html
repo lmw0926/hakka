@@ -59,15 +59,22 @@
     .bg-cat { background-color: #2ecc71; }
     
     /* 例句框基礎樣式 */
+    /* 修改後的例句框基礎樣式 */
     .example-box {
-      white-space: pre-line;
-      background: #f1f3f5; padding: 10px; border-left: 4px solid #3498db;
-      font-size: 1.5rem; color: #34495e; border-radius: 0 4px 4px 0;
-      flex-grow: 1; overflow-y: auto;
+      white-space: pre-wrap; /* 改為 pre-wrap */
+      background: #f1f3f5; 
+      padding: 8px 10px;    /* 稍微縮小頂部 padding (原為 10px) */
+      border-left: 4px solid #3498db;
+      font-size: 1.5rem; 
+      color: #34495e; 
+      border-radius: 0 4px 4px 0;
+      flex-grow: 1; 
+      overflow-y: auto;
       transition: all 0.4s ease-in-out;
       cursor: zoom-in;
       position: relative;
-      text-align: left; /* 強制內容靠左對齊，覆蓋父層 center */
+      text-align: left;
+      line-height: 1.4;      /* 明確設定行高，避免預設行高過大 */
     }
 
     /* 例句框放大樣式 */
@@ -269,9 +276,7 @@
                 </div>
                 <div class="pinyin" style="margin-left: 47px;">${item.pinyin || ''}</div>
                 <div class="badge-group" style="margin-left: 47px;">${posBadges}</div>
-                <div class="example-box" onclick="toggleExampleExpansion(this, event)">
-                  <span class="example-label">例句：</span>${item.example || '（暫無例句）'}
-                </div>
+                <div class="example-box" onclick="toggleExampleExpansion(this, event)"><span class="example-label">例句：</span>${item.example || '（暫無例句）'}</div>
               </div>
               <div class="card-back">
                 <div class="word-header"><span class="word-title" style="color:#28a745;">解釋與翻譯</span></div>

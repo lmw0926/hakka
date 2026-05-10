@@ -321,10 +321,19 @@
       const audioPlayer = document.getElementById('global-audio');
       audioPlayer.onended = null; 
       clearInterval(timeCheckInterval); 
-
+    
+      // --- 新增邏輯：如果在全頁播放模式下點擊特定卡片，更新播放進度 ---
+      if (currentPlaylist.length > 0) {
+        const foundIndex = currentPlaylist.findIndex(item => String(item.id) === String(id));
+        if (foundIndex !== -1) {
+          currentIndex = foundIndex; // 將播放進度跳轉到點擊的這一張
+        }
+      }
+      // -------------------------------------------------------
+    
       document.querySelectorAll('.example-box.expanded').forEach(box => box.classList.remove('expanded'));
       document.querySelectorAll('.word-card').forEach(c => c.classList.remove('playing-highlight'));
-
+    
       const targetCard = document.getElementById('card-' + id);
       if (targetCard) {
         targetCard.classList.add('playing-highlight');
@@ -335,10 +344,12 @@
       
       if (!url || url === "null" || url.trim() === "") { 
         document.getElementById('current-word').innerText = "跳過無音檔: " + name;
-        if (currentPlaylist.length > 0) setTimeout(handleAutoNext, 1200); 
+        if (currentPlaylist.length > 0) {
+          setTimeout(handleAutoNext, 1200); 
+        }
         return; 
       }
-
+    
       const finalUrl = url.trim().replace("dl=0", "raw=1");
       document.getElementById('player-container').style.display = 'block';
       document.getElementById('current-word').innerText = "播放中: " + name;
@@ -363,7 +374,9 @@
                 handleAutoNext(); 
               }
             }, 100);
-          } else { audioPlayer.onended = () => handleAutoNext(); }
+          } else { 
+            audioPlayer.onended = () => handleAutoNext(); 
+          }
         }).catch(e => {
             console.error("播放受限", e);
             if (currentPlaylist.length > 0) handleAutoNext();

@@ -28,7 +28,15 @@
       transform: scale(1.02);
       z-index: 10;
       background-color: #eef7ff !important;
+      min-height: 360px !important; /* 卡片本體也隨之更明顯加高240px * 1.5 = 360px */
     }
+    /* 當卡片處於播放中狀態時，調整內部例句框的高度 */
+    .playing-highlight .example-box {
+      min-height: 200px; /* 設定一個較大的最小高度 */
+      max-height: 400px; /* 防止過度膨脹 */
+      transition: all 0.4s ease; /* 讓加高的過程有平滑動畫感 */
+    }
+
 
     .card-container { perspective: 1000px; margin-bottom: 20px; position: relative;}
     .word-card {
